@@ -3,6 +3,7 @@ const mongoose = require("mongoose");
 const bodyParser = require("body-parser");
 const User = require("./model");
 const cron = require("node-cron");
+const axios = require("axios");
 const app = express();
 const PORT = 3000;
 const CONNECTION_STRING = "";
@@ -94,9 +95,34 @@ app.listen(PORT, () => {
 cron.schedule("0,30 9-17 * * *", async () => {
   try {
     const users = await User.find({});
-    // TODO: fcm push notification logic here
-    console.log(users);
+
+    // Form the messages array
+    const messages = users.map((user, index) => ({
+      to: user.expoPushToken, // assuming the token is stored in this field
+      title: "Drink Water Reminder",
+      body: "It's time to drink water!",
+      priority: "high",
+      sound: "default",
+      data: {
+        messageid: String(index + 1),
+        dateTime: new Date().toISOString(),
+        userId: user._id.toString(), // include user ID for tracking
+      },
+    }));
+
+    // Send push notifications
+    const response = await axios.post(
+      "https://exp.host/--/api/v2/push/send",
+      messages,
+      {
+        headers: {
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    console.log("Push response:", response.data);
   } catch (err) {
-    console.error("Error fetching user tokens:", err.message);
+    console.error("Error sending push notification:", err.message);
   }
 });
